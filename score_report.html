@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>参加者スコア集計</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #fff;
+      --line: #d9deea;
+      --text: #1f2937;
+      --muted: #5b6472;
+      --accent: #2563eb;
+      --stripe: #f8fafc;
+      --hover: #eef2ff;
+      --best: #15803d;
+      --best-bg: #dcfce7;
+      --worst: #b91c1c;
+      --worst-bg: #fee2e2;
+    }
+    body {
+      margin: 0;
+      font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      align-items: center;
+      margin: 20px 0;
+    }
+    label { color: var(--muted); }
+    select {
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .legend .val { font-size: 12px; }
+    .sort-status { font-size: 13px; color: var(--muted); margin: -8px 0 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th { background: #eef2ff; }
+    th.sortable { padding: 0; }
+    th.sortable button {
+      all: inherit;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    th.num.sortable button { justify-content: flex-end; }
+    th.sortable button:hover { color: var(--accent); }
+    th.sortable button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .sort-icon { color: var(--muted); font-size: 11px; }
+    th[aria-sort] .sort-icon { color: var(--accent); }
+    tbody tr:nth-child(even) { background: var(--stripe); }
+    tbody tr:hover { background: var(--hover); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .avg, .stat-avg dd { font-weight: 700; }
+    .val {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .val.best { color: var(--best); background: var(--best-bg); font-weight: 700; }
+    .val.worst { color: var(--worst); background: var(--worst-bg); font-weight: 700; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 18px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 12px;
+      margin: 0 0 12px;
+    }
+    .stats dt { color: var(--muted); font-size: 12px; }
+    .stats dd { margin: 0; }
+    .stat-avg dd { font-size: 20px; }
+    details { margin-top: 8px; }
+    summary {
+      cursor: pointer;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>参加者スコア集計</h1>
+    <p>平均・最高点・最低点と、受けた科目（折りたたみ）を表示します。</p>
+    <div class="toolbar">
+      <div>
+        <label for="view">リスト形式</label>
+        <select id="view">
+          <option value="table">表形式</option>
+          <option value="detail">カード形式</option>
+        </select>
+      </div>
+      <div class="legend">
+        <span><span class="val best">緑</span> 各項目で最も高い値</span>
+        <span><span class="val worst">赤</span> 各項目で最も低い値</span>
+      </div>
+    </div>
+    <p class="sort-status" id="sort-status">並び順：元の順（表の見出しをクリックで並べ替え）</p>
+    <section id="view-table">
+      <table>
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th class="num sortable" data-key="avg"><button type="button">平均<span class="sort-icon">⇅</span></button></th>
+            <th class="num sortable" data-key="max"><button type="button">最高点<span class="sort-icon">⇅</span></button></th>
+            <th class="num sortable" data-key="min"><button type="button">最低点<span class="sort-icon">⇅</span></button></th>
+            <th>受けた科目</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          
+<tr data-index="0" data-name="山田太郎" data-avg="83.625" data-max="91" data-min="75">
+  <td>山田太郎</td>
+  <td class="num avg"><span class="val">83.6</span></td>
+  <td class="num"><span class="val">91</span></td>
+  <td class="num"><span class="val">75</span></td>
+  <td>
+    <details>
+      <summary>5科目</summary>
+      <ul><li><strong>数学</strong>: 2024-09-01 80点, 2024-09-03 82点</li><li><strong>英語</strong>: 2024-09-01 90点, 2024-09-03 78点</li><li><strong>国語</strong>: 2024-09-01 75点, 2024-09-04 91点</li><li><strong>理科</strong>: 2024-09-02 85点</li><li><strong>社会</strong>: 2024-09-02 88点</li></ul>
+    </details>
+  </td>
+</tr>
+
+<tr data-index="1" data-name="鈴木花子" data-avg="88.625" data-max="94" data-min="80">
+  <td>鈴木花子</td>
+  <td class="num avg"><span class="val">88.6</span></td>
+  <td class="num"><span class="val">94</span></td>
+  <td class="num"><span class="val">80</span></td>
+  <td>
+    <details>
+      <summary>5科目</summary>
+      <ul><li><strong>数学</strong>: 2024-09-01 88点, 2024-09-03 94点</li><li><strong>英語</strong>: 2024-09-01 92点, 2024-09-03 87点</li><li><strong>国語</strong>: 2024-09-01 85点, 2024-09-04 93点</li><li><strong>理科</strong>: 2024-09-02 80点</li><li><strong>社会</strong>: 2024-09-02 90点</li></ul>
+    </details>
+  </td>
+</tr>
+
+<tr data-index="2" data-name="佐藤次郎" data-avg="73.125" data-max="80" data-min="65">
+  <td>佐藤次郎</td>
+  <td class="num avg"><span class="val worst">73.1</span></td>
+  <td class="num"><span class="val worst">80</span></td>
+  <td class="num"><span class="val worst">65</span></td>
+  <td>
+    <details>
+      <summary>5科目</summary>
+      <ul><li><strong>数学</strong>: 2024-09-01 70点, 2024-09-03 75点</li><li><strong>英語</strong>: 2024-09-01 78点, 2024-09-03 80点</li><li><strong>国語</strong>: 2024-09-01 65点, 2024-09-04 77点</li><li><strong>理科</strong>: 2024-09-02 72点</li><li><strong>社会</strong>: 2024-09-02 68点</li></ul>
+    </details>
+  </td>
+</tr>
+
+<tr data-index="3" data-name="田中一郎" data-avg="87.5" data-max="92" data-min="83">
+  <td>田中一郎</td>
+  <td class="num avg"><span class="val">87.5</span></td>
+  <td class="num"><span class="val">92</span></td>
+  <td class="num"><span class="val">83</span></td>
+  <td>
+    <details>
+      <summary>5科目</summary>
+      <ul><li><strong>数学</strong>: 2024-09-02 85点, 2024-09-04 88点</li><li><strong>英語</strong>: 2024-09-02 87点, 2024-09-05 92点</li><li><strong>国語</strong>: 2024-09-03 83点, 2024-09-05 86点</li><li><strong>理科</strong>: 2024-09-03 89点</li><li><strong>社会</strong>: 2024-09-04 90点</li></ul>
+    </details>
+  </td>
+</tr>
+
+<tr data-index="4" data-name="高橋花子" data-avg="92.0" data-max="96" data-min="88">
+  <td>高橋花子</td>
+  <td class="num avg"><span class="val best">92.0</span></td>
+  <td class="num"><span class="val best">96</span></td>
+  <td class="num"><span class="val best">88</span></td>
+  <td>
+    <details>
+      <summary>5科目</summary>
+      <ul><li><strong>数学</strong>: 2024-09-02 95点, 2024-09-04 91点</li><li><strong>英語</strong>: 2024-09-02 90点, 2024-09-05 93点</li><li><strong>国語</strong>: 2024-09-03 94点, 2024-09-05 88点</li><li><strong>理科</strong>: 2024-09-03 96点</li><li><strong>社会</strong>: 2024-09-04 89点</li></ul>
+    </details>
+  </td>
+</tr>
+
+        </tbody>
+      </table>
+    </section>
+    <section id="view-detail" class="cards hidden">
+      
+<article class="card" data-index="0" data-name="山田太郎" data-avg="83.625" data-max="91" data-min="75">
+  <h2>山田太郎</h2>
+  <dl class="stats">
+    <div class="stat-avg"><dt>平均</dt><dd class="val">83.6</dd></div>
+    <div><dt>最高点</dt><dd class="val">91</dd></div>
+    <div><dt>最低点</dt><dd class="val">75</dd></div>
+  </dl>
+  <details>
+    <summary>受けた科目（5科目）</summary>
+    <ul><li><strong>数学</strong>: 2024-09-01 80点, 2024-09-03 82点</li><li><strong>英語</strong>: 2024-09-01 90点, 2024-09-03 78点</li><li><strong>国語</strong>: 2024-09-01 75点, 2024-09-04 91点</li><li><strong>理科</strong>: 2024-09-02 85点</li><li><strong>社会</strong>: 2024-09-02 88点</li></ul>
+  </details>
+</article>
+
+<article class="card" data-index="1" data-name="鈴木花子" data-avg="88.625" data-max="94" data-min="80">
+  <h2>鈴木花子</h2>
+  <dl class="stats">
+    <div class="stat-avg"><dt>平均</dt><dd class="val">88.6</dd></div>
+    <div><dt>最高点</dt><dd class="val">94</dd></div>
+    <div><dt>最低点</dt><dd class="val">80</dd></div>
+  </dl>
+  <details>
+    <summary>受けた科目（5科目）</summary>
+    <ul><li><strong>数学</strong>: 2024-09-01 88点, 2024-09-03 94点</li><li><strong>英語</strong>: 2024-09-01 92点, 2024-09-03 87点</li><li><strong>国語</strong>: 2024-09-01 85点, 2024-09-04 93点</li><li><strong>理科</strong>: 2024-09-02 80点</li><li><strong>社会</strong>: 2024-09-02 90点</li></ul>
+  </details>
+</article>
+
+<article class="card" data-index="2" data-name="佐藤次郎" data-avg="73.125" data-max="80" data-min="65">
+  <h2>佐藤次郎</h2>
+  <dl class="stats">
+    <div class="stat-avg"><dt>平均</dt><dd class="val worst">73.1</dd></div>
+    <div><dt>最高点</dt><dd class="val worst">80</dd></div>
+    <div><dt>最低点</dt><dd class="val worst">65</dd></div>
+  </dl>
+  <details>
+    <summary>受けた科目（5科目）</summary>
+    <ul><li><strong>数学</strong>: 2024-09-01 70点, 2024-09-03 75点</li><li><strong>英語</strong>: 2024-09-01 78点, 2024-09-03 80点</li><li><strong>国語</strong>: 2024-09-01 65点, 2024-09-04 77点</li><li><strong>理科</strong>: 2024-09-02 72点</li><li><strong>社会</strong>: 2024-09-02 68点</li></ul>
+  </details>
+</article>
+
+<article class="card" data-index="3" data-name="田中一郎" data-avg="87.5" data-max="92" data-min="83">
+  <h2>田中一郎</h2>
+  <dl class="stats">
+    <div class="stat-avg"><dt>平均</dt><dd class="val">87.5</dd></div>
+    <div><dt>最高点</dt><dd class="val">92</dd></div>
+    <div><dt>最低点</dt><dd class="val">83</dd></div>
+  </dl>
+  <details>
+    <summary>受けた科目（5科目）</summary>
+    <ul><li><strong>数学</strong>: 2024-09-02 85点, 2024-09-04 88点</li><li><strong>英語</strong>: 2024-09-02 87点, 2024-09-05 92点</li><li><strong>国語</strong>: 2024-09-03 83点, 2024-09-05 86点</li><li><strong>理科</strong>: 2024-09-03 89点</li><li><strong>社会</strong>: 2024-09-04 90点</li></ul>
+  </details>
+</article>
+
+<article class="card" data-index="4" data-name="高橋花子" data-avg="92.0" data-max="96" data-min="88">
+  <h2>高橋花子</h2>
+  <dl class="stats">
+    <div class="stat-avg"><dt>平均</dt><dd class="val best">92.0</dd></div>
+    <div><dt>最高点</dt><dd class="val best">96</dd></div>
+    <div><dt>最低点</dt><dd class="val best">88</dd></div>
+  </dl>
+  <details>
+    <summary>受けた科目（5科目）</summary>
+    <ul><li><strong>数学</strong>: 2024-09-02 95点, 2024-09-04 91点</li><li><strong>英語</strong>: 2024-09-02 90点, 2024-09-05 93点</li><li><strong>国語</strong>: 2024-09-03 94点, 2024-09-05 88点</li><li><strong>理科</strong>: 2024-09-03 96点</li><li><strong>社会</strong>: 2024-09-04 89点</li></ul>
+  </details>
+</article>
+
+    </section>
+  </main>
+  <script>
+    const select = document.getElementById("view");
+    const views = {
+      table: document.getElementById("view-table"),
+      detail: document.getElementById("view-detail"),
+    };
+    select.addEventListener("change", () => {
+      Object.entries(views).forEach(([key, el]) => {
+        el.classList.toggle("hidden", key !== select.value);
+      });
+    });
+
+    const labels = { avg: "平均", max: "最高点", min: "最低点" };
+    const headers = document.querySelectorAll("th.sortable");
+    const status = document.getElementById("sort-status");
+    let sortKey = null;
+    let sortDir = null;
+
+    function compare(a, b) {
+      let result = Number(a.dataset[sortKey]) - Number(b.dataset[sortKey]);
+      if (sortDir === "desc") result = -result;
+      return result || Number(a.dataset.index) - Number(b.dataset.index);
+    }
+
+    function applySort() {
+      [document.getElementById("table-body"), views.detail].forEach((container) => {
+        [...container.children].sort(compare).forEach((el) => container.appendChild(el));
+      });
+      headers.forEach((th) => {
+        const icon = th.querySelector(".sort-icon");
+        if (th.dataset.key === sortKey) {
+          th.setAttribute("aria-sort", sortDir === "asc" ? "ascending" : "descending");
+          icon.textContent = sortDir === "asc" ? "▲" : "▼";
+        } else {
+          th.removeAttribute("aria-sort");
+          icon.textContent = "⇅";
+        }
+      });
+      const dirLabel = sortDir === "asc" ? "昇順" : "降順";
+      status.textContent = `並び順：${labels[sortKey]}の${dirLabel}（もう一度クリックで切り替え）`;
+    }
+
+    headers.forEach((th) => {
+      th.querySelector("button").addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (sortKey === key) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          sortDir = "desc";
+        }
+        applySort();
+      });
+    });
+  </script>
+</body>
+</html>
